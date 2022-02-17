@@ -55,7 +55,7 @@ func (db *Sqlite) Create(table string, objptr interface{}) (err error) {
 		cmd   = []string{}
 	)
 	cmd = append(cmd, "CREATE TABLE IF NOT EXISTS")
-	cmd = append(cmd, table)
+	cmd = append(cmd, "'"+table+"'")
 	cmd = append(cmd, "(")
 	if top == 0 {
 		cmd = append(cmd, tags[0])
@@ -86,7 +86,7 @@ func (db *Sqlite) Create(table string, objptr interface{}) (err error) {
 // 默认结构体的第一个元素为主键
 // 返回错误
 func (db *Sqlite) Insert(table string, objptr interface{}) error {
-	rows, err := db.DB.Query("SELECT * FROM " + table + " limit 1;")
+	rows, err := db.DB.Query("SELECT * FROM '" + table + "' limit 1;")
 	if err != nil {
 		return err
 	}
@@ -155,7 +155,7 @@ func (db *Sqlite) Insert(table string, objptr interface{}) error {
 // 默认结构体的第一个元素为主键
 // 返回错误
 func (db *Sqlite) InsertUnique(table string, objptr interface{}) error {
-	rows, err := db.DB.Query("SELECT * FROM " + table + " limit 1;")
+	rows, err := db.DB.Query("SELECT * FROM '" + table + "' limit 1;")
 	if err != nil {
 		return err
 	}
@@ -225,8 +225,8 @@ func (db *Sqlite) InsertUnique(table string, objptr interface{}) error {
 // 返回错误
 func (db *Sqlite) Find(table string, objptr interface{}, condition string) error {
 	var cmd = []string{}
-	cmd = append(cmd, "SELECT * FROM ")
-	cmd = append(cmd, table)
+	cmd = append(cmd, "SELECT * FROM")
+	cmd = append(cmd, "'"+table+"'")
 	cmd = append(cmd, condition)
 	rows, err := db.DB.Query(strings.Join(cmd, " ") + ";")
 	if err != nil {
@@ -257,7 +257,7 @@ func (db *Sqlite) Find(table string, objptr interface{}, condition string) error
 func (db *Sqlite) CanFind(table string, condition string) bool {
 	var cmd = []string{}
 	cmd = append(cmd, "SELECT * FROM")
-	cmd = append(cmd, table)
+	cmd = append(cmd, "'"+table+"'")
 	cmd = append(cmd, condition)
 	rows, err := db.DB.Query(strings.Join(cmd, " ") + ";")
 	if err != nil {
@@ -282,7 +282,7 @@ func (db *Sqlite) CanFind(table string, condition string) bool {
 func (db *Sqlite) FindFor(table string, objptr interface{}, condition string, f func() error) error {
 	var cmd = []string{}
 	cmd = append(cmd, "SELECT * FROM")
-	cmd = append(cmd, table)
+	cmd = append(cmd, "'"+table+"'")
 	cmd = append(cmd, condition)
 	rows, err := db.DB.Query(strings.Join(cmd, " ") + ";")
 	if err != nil {
@@ -348,7 +348,7 @@ func (db *Sqlite) ListTables() (s []string, err error) {
 func (db *Sqlite) Del(table string, condition string) error {
 	var cmd = []string{}
 	cmd = append(cmd, "DELETE FROM")
-	cmd = append(cmd, table)
+	cmd = append(cmd, "'"+table+"'")
 	cmd = append(cmd, condition)
 	stmt, err := db.DB.Prepare(strings.Join(cmd, " ") + ";")
 	if err != nil {
@@ -365,7 +365,7 @@ func (db *Sqlite) Del(table string, condition string) error {
 func (db *Sqlite) Truncate(table string) error {
 	var cmd = []string{}
 	cmd = append(cmd, "TRUNCATE TABLE")
-	cmd = append(cmd, table)
+	cmd = append(cmd, "'"+table+"'")
 	stmt, err := db.DB.Prepare(strings.Join(cmd, " ") + ";")
 	if err != nil {
 		return err
@@ -382,7 +382,7 @@ func (db *Sqlite) Truncate(table string) error {
 func (db *Sqlite) Count(table string) (num int, err error) {
 	var cmd = []string{}
 	cmd = append(cmd, "SELECT COUNT(1) FROM")
-	cmd = append(cmd, table)
+	cmd = append(cmd, "'"+table+"'")
 	rows, err := db.DB.Query(strings.Join(cmd, " ") + ";")
 	if err != nil {
 		return num, err
