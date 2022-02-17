@@ -401,12 +401,15 @@ func (db *Sqlite) Count(table string) (num int, err error) {
 func tags(objptr interface{}) []string {
 	var tags []string
 	elem := reflect.ValueOf(objptr).Elem()
-	// 判断第一个元素是否为匿名字段
-	if elem.Type().Field(0).Anonymous {
-		elem = elem.Field(0)
-	}
 	for i, flen := 0, elem.Type().NumField(); i < flen; i++ {
-		tags = append(tags, elem.Type().Field(i).Tag.Get("db"))
+		t := elem.Type().Field(i).Tag.Get("db")
+		if t == "" {
+			t = elem.Type().Field(i).Tag.Get("json")
+			if t == "" {
+				t = elem.Type().Field(i).Name
+			}
+		}
+		tags = append(tags, t)
 	}
 	return tags
 }
@@ -450,10 +453,6 @@ func kinds(objptr interface{}) []string {
 func values(objptr interface{}) []interface{} {
 	var values []interface{}
 	elem := reflect.ValueOf(objptr).Elem()
-	// 判断第一个元素是否为匿名字段
-	if elem.Type().Field(0).Anonymous {
-		elem = elem.Field(0)
-	}
 	for i, flen := 0, elem.Type().NumField(); i < flen; i++ {
 		if elem.Field(i).Type() == reflect.SliceOf(reflect.TypeOf("")) { // []string
 			values = append(values, elem.Field(i).Index(0).Interface()) // string
@@ -468,10 +467,6 @@ func values(objptr interface{}) []interface{} {
 func addrs(objptr interface{}) []interface{} {
 	var addrs []interface{}
 	elem := reflect.ValueOf(objptr).Elem()
-	// 判断第一个元素是否为匿名字段
-	if elem.Type().Field(0).Anonymous {
-		elem = elem.Field(0)
-	}
 	for i, flen := 0, elem.Type().NumField(); i < flen; i++ {
 		if elem.Field(i).Type() == reflect.SliceOf(reflect.TypeOf("")) { // []string
 			s := reflect.ValueOf(make([]string, 1))
