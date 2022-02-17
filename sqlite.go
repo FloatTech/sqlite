@@ -424,6 +424,8 @@ func kinds(objptr interface{}) []string {
 	}
 	for i, flen := 0, elem.Type().NumField(); i < flen; i++ {
 		switch elem.Field(i).Type().String() {
+		case "bool":
+			kinds = append(kinds, "BOOLEAN")
 		case "int8":
 			kinds = append(kinds, "TINYINT")
 		case "uint8", "byte":
@@ -440,8 +442,6 @@ func kinds(objptr interface{}) []string {
 			kinds = append(kinds, "BIGINT")
 		case "uint64":
 			kinds = append(kinds, "UNSIGNED BIGINT")
-		case "string":
-			kinds = append(kinds, "TEXT")
 		default:
 			kinds = append(kinds, "TEXT")
 		}
