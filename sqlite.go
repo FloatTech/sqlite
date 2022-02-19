@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"strings"
 
-	_ "github.com/logoove/sqlite" // 引入sqlite
+	_ "github.com/fumiama/sqlite3" // 引入sqlite
 )
 
 // Sqlite 数据库对象
