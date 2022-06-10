@@ -6,25 +6,35 @@ import (
 	"errors"
 	"reflect"
 	"strings"
+	"time"
 	"unicode"
 
 	_ "github.com/fumiama/sqlite3" // 引入sqlite
+	"github.com/wdvxdr1123/ZeroBot/extension/ttl"
 )
 
 // Sqlite 数据库对象
 type Sqlite struct {
-	DB     *sql.DB
-	DBPath string
+	DB        *sql.DB
+	DBPath    string
+	stmtcache *ttl.Cache[string, *sql.Stmt]
 }
 
 // Open 打开数据库
-func (db *Sqlite) Open() (err error) {
+func (db *Sqlite) Open(cachettl time.Duration) (err error) {
 	if db.DB == nil {
 		database, err := sql.Open("sqlite3", db.DBPath)
 		if err != nil {
 			return err
 		}
 		db.DB = database
+	}
+	if db.stmtcache == nil {
+		db.stmtcache = ttl.NewCacheOn(cachettl, [4]func(string, *sql.Stmt){
+			nil, nil,
+			func(_ string, stmt *sql.Stmt) { _ = stmt.Close() },
+			nil,
+		})
 	}
 	return
 }
@@ -34,8 +44,18 @@ func (db *Sqlite) Close() (err error) {
 	if db.DB != nil {
 		err = db.DB.Close()
 		db.DB = nil
+		db.stmtcache.Destroy()
+		db.stmtcache = nil
 	}
 	return
+}
+
+func wraptable(table string) string {
+	if unicode.IsDigit([]rune(table)[0]) {
+		return "[" + table + "]"
+	} else {
+		return "'" + table + "'"
+	}
 }
 
 // Create 生成数据库
@@ -53,31 +73,19 @@ func (db *Sqlite) Create(table string, objptr interface{}) (err error) {
 		tags  = tags(objptr)
 		kinds = kinds(objptr)
 		top   = len(tags) - 1
-		cmd   = []string{}
+		cmd   = make([]string, 0, 3*(len(tags)+1))
 	)
-	if unicode.IsDigit([]rune(table)[0]) {
-		table = "[" + table + "]"
-	} else {
-		table = "'" + table + "'"
-	}
-	cmd = append(cmd, "CREATE TABLE IF NOT EXISTS")
-	cmd = append(cmd, table)
-	cmd = append(cmd, "(")
+	cmd = append(cmd, "CREATE TABLE IF NOT EXISTS", wraptable(table), "(")
 	if top == 0 {
-		cmd = append(cmd, tags[0])
-		cmd = append(cmd, kinds[0])
-		cmd = append(cmd, "PRIMARY KEY")
-		cmd = append(cmd, "NOT NULL);")
+		cmd = append(cmd, tags[0], kinds[0], "PRIMARY KEY NOT NULL);")
 	} else {
 		for i := range tags {
-			cmd = append(cmd, tags[i])
-			cmd = append(cmd, kinds[i])
+			cmd = append(cmd, tags[i], kinds[i])
 			switch i {
 			default:
 				cmd = append(cmd, "NULL,")
 			case 0:
-				cmd = append(cmd, "PRIMARY KEY")
-				cmd = append(cmd, "NOT NULL,")
+				cmd = append(cmd, "PRIMARY KEY NOT NULL,")
 			case top:
 				cmd = append(cmd, "NULL)")
 			}
@@ -92,11 +100,7 @@ func (db *Sqlite) Create(table string, objptr interface{}) (err error) {
 // 默认结构体的第一个元素为主键
 // 返回错误
 func (db *Sqlite) Insert(table string, objptr interface{}) error {
-	if unicode.IsDigit([]rune(table)[0]) {
-		table = "[" + table + "]"
-	} else {
-		table = "'" + table + "'"
-	}
+	table = wraptable(table)
 	rows, err := db.DB.Query("SELECT * FROM " + table + " limit 1;")
 	if err != nil {
 		return err
@@ -109,17 +113,14 @@ func (db *Sqlite) Insert(table string, objptr interface{}) error {
 	var (
 		vals = values(objptr)
 		top  = len(tags) - 1
-		cmd  = []string{}
+		cmd  = make([]string, 0, 2+4*len(tags))
 	)
 	cmd = append(cmd, "REPLACE INTO")
 	cmd = append(cmd, table)
 	if top == 0 {
 		cmd = append(cmd, "(")
 		cmd = append(cmd, tags[0])
-		cmd = append(cmd, ")")
-		cmd = append(cmd, "VALUES (")
-		cmd = append(cmd, "?")
-		cmd = append(cmd, ")")
+		cmd = append(cmd, ") VALUES ( ? )")
 	} else {
 		for i := range tags {
 			switch i {
@@ -138,27 +139,25 @@ func (db *Sqlite) Insert(table string, objptr interface{}) error {
 		for i := range tags {
 			switch i {
 			default:
-				cmd = append(cmd, "?")
-				cmd = append(cmd, ",")
+				cmd = append(cmd, "? ,")
 			case 0:
-				cmd = append(cmd, "VALUES (")
-				cmd = append(cmd, "?")
-				cmd = append(cmd, ",")
+				cmd = append(cmd, "VALUES ( ? ,")
 			case top:
-				cmd = append(cmd, "?")
-				cmd = append(cmd, ")")
+				cmd = append(cmd, "? )")
 			}
 		}
 	}
-	stmt, err := db.DB.Prepare(strings.Join(cmd, " ") + ";")
-	if err != nil {
-		return err
+	q := strings.Join(cmd, " ") + ";"
+	stmt := db.stmtcache.Get(q)
+	if stmt == nil {
+		stmt, err := db.DB.Prepare(q)
+		if err != nil {
+			return err
+		}
+		db.stmtcache.Set(q, stmt)
 	}
 	_, err = stmt.Exec(vals...)
-	if err != nil {
-		return err
-	}
-	return stmt.Close()
+	return err
 }
 
 // InsertUnique 插入数据集
@@ -166,11 +165,7 @@ func (db *Sqlite) Insert(table string, objptr interface{}) error {
 // 默认结构体的第一个元素为主键
 // 返回错误
 func (db *Sqlite) InsertUnique(table string, objptr interface{}) error {
-	if unicode.IsDigit([]rune(table)[0]) {
-		table = "[" + table + "]"
-	} else {
-		table = "'" + table + "'"
-	}
+	table = wraptable(table)
 	rows, err := db.DB.Query("SELECT * FROM '" + table + "' limit 1;")
 	if err != nil {
 		return err
@@ -183,17 +178,14 @@ func (db *Sqlite) InsertUnique(table string, objptr interface{}) error {
 	var (
 		vals = values(objptr)
 		top  = len(tags) - 1
-		cmd  = []string{}
+		cmd  = make([]string, 0, 2+4*len(tags))
 	)
 	cmd = append(cmd, "INSERT INTO")
 	cmd = append(cmd, table)
 	if top == 0 {
 		cmd = append(cmd, "(")
 		cmd = append(cmd, tags[0])
-		cmd = append(cmd, ")")
-		cmd = append(cmd, "VALUES (")
-		cmd = append(cmd, "?")
-		cmd = append(cmd, ")")
+		cmd = append(cmd, ") VALUES ( ? )")
 	} else {
 		for i := range tags {
 			switch i {
@@ -212,27 +204,26 @@ func (db *Sqlite) InsertUnique(table string, objptr interface{}) error {
 		for i := range tags {
 			switch i {
 			default:
-				cmd = append(cmd, "?")
-				cmd = append(cmd, ",")
+				cmd = append(cmd, "? ,")
 			case 0:
-				cmd = append(cmd, "VALUES (")
-				cmd = append(cmd, "?")
-				cmd = append(cmd, ",")
+				cmd = append(cmd, "VALUES ( ? ,")
 			case top:
-				cmd = append(cmd, "?")
-				cmd = append(cmd, ")")
+				cmd = append(cmd, "? )")
 			}
 		}
 	}
-	stmt, err := db.DB.Prepare(strings.Join(cmd, " ") + ";")
-	if err != nil {
-		return err
+	q := strings.Join(cmd, " ") + ";"
+	stmt := db.stmtcache.Get(q)
+	if stmt == nil {
+		stmt, err := db.DB.Prepare(q)
+		if err != nil {
+			return err
+		}
+		db.stmtcache.Set(q, stmt)
 	}
+
 	_, err = stmt.Exec(vals...)
-	if err != nil {
-		return err
-	}
-	return stmt.Close()
+	return err
 }
 
 // Find 查询数据库，写入最后一条结果到 objptr
@@ -240,16 +231,16 @@ func (db *Sqlite) InsertUnique(table string, objptr interface{}) error {
 // 默认字段与结构体元素顺序一致
 // 返回错误
 func (db *Sqlite) Find(table string, objptr interface{}, condition string) error {
-	if unicode.IsDigit([]rune(table)[0]) {
-		table = "[" + table + "]"
-	} else {
-		table = "'" + table + "'"
+	q := "SELECT * FROM " + wraptable(table) + " " + condition + ";"
+	stmt := db.stmtcache.Get(q)
+	if stmt == nil {
+		stmt, err := db.DB.Prepare(q)
+		if err != nil {
+			return err
+		}
+		db.stmtcache.Set(q, stmt)
 	}
-	var cmd = []string{}
-	cmd = append(cmd, "SELECT * FROM")
-	cmd = append(cmd, table)
-	cmd = append(cmd, condition)
-	rows, err := db.DB.Query(strings.Join(cmd, " ") + ";")
+	rows, err := stmt.Query()
 	if err != nil {
 		return err
 	}
@@ -276,16 +267,16 @@ func (db *Sqlite) Find(table string, objptr interface{}, condition string) error
 // 默认字段与结构体元素顺序一致
 // 返回错误
 func (db *Sqlite) CanFind(table string, condition string) bool {
-	if unicode.IsDigit([]rune(table)[0]) {
-		table = "[" + table + "]"
-	} else {
-		table = "'" + table + "'"
+	q := "SELECT * FROM " + wraptable(table) + " " + condition + ";"
+	stmt := db.stmtcache.Get(q)
+	if stmt == nil {
+		stmt, err := db.DB.Prepare(q)
+		if err != nil {
+			return false
+		}
+		db.stmtcache.Set(q, stmt)
 	}
-	var cmd = []string{}
-	cmd = append(cmd, "SELECT * FROM")
-	cmd = append(cmd, table)
-	cmd = append(cmd, condition)
-	rows, err := db.DB.Query(strings.Join(cmd, " ") + ";")
+	rows, err := stmt.Query()
 	if err != nil {
 		return false
 	}
@@ -306,16 +297,16 @@ func (db *Sqlite) CanFind(table string, condition string) bool {
 // 默认字段与结构体元素顺序一致
 // 返回错误
 func (db *Sqlite) FindFor(table string, objptr interface{}, condition string, f func() error) error {
-	if unicode.IsDigit([]rune(table)[0]) {
-		table = "[" + table + "]"
-	} else {
-		table = "'" + table + "'"
+	q := "SELECT * FROM " + wraptable(table) + " " + condition + ";"
+	stmt := db.stmtcache.Get(q)
+	if stmt == nil {
+		stmt, err := db.DB.Prepare(q)
+		if err != nil {
+			return err
+		}
+		db.stmtcache.Set(q, stmt)
 	}
-	var cmd = []string{}
-	cmd = append(cmd, "SELECT * FROM")
-	cmd = append(cmd, table)
-	cmd = append(cmd, condition)
-	rows, err := db.DB.Query(strings.Join(cmd, " ") + ";")
+	rows, err := stmt.Query()
 	if err != nil {
 		return err
 	}
@@ -351,7 +342,16 @@ func (db *Sqlite) Pick(table string, objptr interface{}) error {
 // ListTables 列出所有表名
 // 返回所有表名+错误
 func (db *Sqlite) ListTables() (s []string, err error) {
-	rows, err := db.DB.Query("SELECT name FROM sqlite_master where type='table' order by name;")
+	q := "SELECT name FROM sqlite_master where type='table' order by name;"
+	stmt := db.stmtcache.Get(q)
+	if stmt == nil {
+		stmt, err := db.DB.Prepare(q)
+		if err != nil {
+			return nil, err
+		}
+		db.stmtcache.Set(q, stmt)
+	}
+	rows, err := stmt.Query()
 	if err != nil {
 		return
 	}
@@ -377,59 +377,47 @@ func (db *Sqlite) ListTables() (s []string, err error) {
 // condition 可为"WHERE id = 0"
 // 返回错误
 func (db *Sqlite) Del(table string, condition string) error {
-	if unicode.IsDigit([]rune(table)[0]) {
-		table = "[" + table + "]"
-	} else {
-		table = "'" + table + "'"
+	q := "DELETE FROM " + wraptable(table) + " " + condition + ";"
+	stmt := db.stmtcache.Get(q)
+	if stmt == nil {
+		stmt, err := db.DB.Prepare(q)
+		if err != nil {
+			return err
+		}
+		db.stmtcache.Set(q, stmt)
 	}
-	var cmd = []string{}
-	cmd = append(cmd, "DELETE FROM")
-	cmd = append(cmd, table)
-	cmd = append(cmd, condition)
-	stmt, err := db.DB.Prepare(strings.Join(cmd, " ") + ";")
-	if err != nil {
-		return err
-	}
-	_, err = stmt.Exec()
-	if err != nil {
-		return err
-	}
-	return stmt.Close()
+	_, err := stmt.Exec()
+	return err
 }
 
-// Truncate 清空数据库表
-func (db *Sqlite) Truncate(table string) error {
-	if unicode.IsDigit([]rune(table)[0]) {
-		table = "[" + table + "]"
-	} else {
-		table = "'" + table + "'"
+// Drop 删除数据库表
+func (db *Sqlite) Drop(table string) error {
+	q := "DROP TABLE " + wraptable(table) + ";"
+	stmt := db.stmtcache.Get(q)
+	if stmt == nil {
+		stmt, err := db.DB.Prepare(q)
+		if err != nil {
+			return err
+		}
+		db.stmtcache.Set(q, stmt)
 	}
-	var cmd = []string{}
-	cmd = append(cmd, "TRUNCATE TABLE")
-	cmd = append(cmd, table)
-	stmt, err := db.DB.Prepare(strings.Join(cmd, " ") + ";")
-	if err != nil {
-		return err
-	}
-	_, err = stmt.Exec()
-	if err != nil {
-		return err
-	}
-	return stmt.Close()
+	_, err := stmt.Exec()
+	return err
 }
 
 // Count 查询数据库行数
 // 返回行数以及错误
 func (db *Sqlite) Count(table string) (num int, err error) {
-	if unicode.IsDigit([]rune(table)[0]) {
-		table = "[" + table + "]"
-	} else {
-		table = "'" + table + "'"
+	q := "SELECT COUNT(1) FROM " + wraptable(table) + ";"
+	stmt := db.stmtcache.Get(q)
+	if stmt == nil {
+		stmt, err := db.DB.Prepare(q)
+		if err != nil {
+			return 0, err
+		}
+		db.stmtcache.Set(q, stmt)
 	}
-	var cmd = []string{}
-	cmd = append(cmd, "SELECT COUNT(1) FROM")
-	cmd = append(cmd, table)
-	rows, err := db.DB.Query(strings.Join(cmd, " ") + ";")
+	rows, err := stmt.Query()
 	if err != nil {
 		return num, err
 	}
@@ -444,10 +432,11 @@ func (db *Sqlite) Count(table string) (num int, err error) {
 }
 
 // tags 反射 返回结构体对象的 tag 数组
-func tags(objptr interface{}) []string {
-	var tags []string
+func tags(objptr interface{}) (tags []string) {
 	elem := reflect.ValueOf(objptr).Elem()
-	for i, flen := 0, elem.Type().NumField(); i < flen; i++ {
+	flen := elem.Type().NumField()
+	tags = make([]string, flen)
+	for i := 0; i < flen; i++ {
 		t := elem.Type().Field(i).Tag.Get("db")
 		if t == "" {
 			t = elem.Type().Field(i).Tag.Get("json")
@@ -455,72 +444,75 @@ func tags(objptr interface{}) []string {
 				t = elem.Type().Field(i).Name
 			}
 		}
-		tags = append(tags, t)
+		tags[i] = t
 	}
-	return tags
+	return
 }
 
 // kinds 反射 返回结构体对象的 kinds 数组
-func kinds(objptr interface{}) []string {
-	var kinds []string
+func kinds(objptr interface{}) (kinds []string) {
 	elem := reflect.ValueOf(objptr).Elem()
 	// 判断第一个元素是否为匿名字段
 	if elem.Type().Field(0).Anonymous {
 		elem = elem.Field(0)
 	}
-	for i, flen := 0, elem.Type().NumField(); i < flen; i++ {
+	flen := elem.Type().NumField()
+	kinds = make([]string, flen)
+	for i := 0; i < flen; i++ {
 		switch elem.Field(i).Type().String() {
 		case "bool":
-			kinds = append(kinds, "BOOLEAN")
+			kinds[i] = "BOOLEAN"
 		case "int8":
-			kinds = append(kinds, "TINYINT")
+			kinds[i] = "TINYINT"
 		case "uint8", "byte":
-			kinds = append(kinds, "UNSIGNED TINYINT")
+			kinds[i] = "UNSIGNED TINYINT"
 		case "int16":
-			kinds = append(kinds, "SMALLINT")
+			kinds[i] = "SMALLINT"
 		case "uint16":
-			kinds = append(kinds, "UNSIGNED SMALLINT")
+			kinds[i] = "UNSIGNED SMALLINT"
 		case "int32":
-			kinds = append(kinds, "INT")
+			kinds[i] = "INT"
 		case "uint32":
-			kinds = append(kinds, "UNSIGNED INT")
+			kinds[i] = "UNSIGNED INT"
 		case "int64":
-			kinds = append(kinds, "BIGINT")
+			kinds[i] = "BIGINT"
 		case "uint64":
-			kinds = append(kinds, "UNSIGNED BIGINT")
+			kinds[i] = "UNSIGNED BIGINT"
 		default:
-			kinds = append(kinds, "TEXT")
+			kinds[i] = "TEXT"
 		}
 	}
-	return kinds
+	return
 }
 
 // values 反射 返回结构体对象的 values 数组
-func values(objptr interface{}) []interface{} {
-	var values []interface{}
+func values(objptr interface{}) (values []interface{}) {
 	elem := reflect.ValueOf(objptr).Elem()
-	for i, flen := 0, elem.Type().NumField(); i < flen; i++ {
+	flen := elem.Type().NumField()
+	values = make([]interface{}, flen)
+	for i := 0; i < flen; i++ {
 		if elem.Field(i).Type() == reflect.SliceOf(reflect.TypeOf("")) { // []string
-			values = append(values, elem.Field(i).Index(0).Interface()) // string
+			values[i] = elem.Field(i).Index(0).Interface() // string
 			continue
 		}
-		values = append(values, elem.Field(i).Interface())
+		values[i] = elem.Field(i).Interface()
 	}
-	return values
+	return
 }
 
 // addrs 反射 返回结构体对象的 addrs 数组
-func addrs(objptr interface{}) []interface{} {
-	var addrs []interface{}
+func addrs(objptr interface{}) (addrs []interface{}) {
 	elem := reflect.ValueOf(objptr).Elem()
-	for i, flen := 0, elem.Type().NumField(); i < flen; i++ {
+	flen := elem.Type().NumField()
+	addrs = make([]interface{}, flen)
+	for i := 0; i < flen; i++ {
 		if elem.Field(i).Type() == reflect.SliceOf(reflect.TypeOf("")) { // []string
 			s := reflect.ValueOf(make([]string, 1))
 			elem.Field(i).Set(s)
-			addrs = append(addrs, s.Index(0).Addr().Interface()) // string
+			addrs[i] = s.Index(0).Addr().Interface() // string
 			continue
 		}
-		addrs = append(addrs, elem.Field(i).Addr().Interface())
+		addrs[i] = elem.Field(i).Addr().Interface()
 	}
-	return addrs
+	return
 }
