@@ -150,7 +150,8 @@ func (db *Sqlite) Insert(table string, objptr interface{}) error {
 	q := strings.Join(cmd, " ") + ";"
 	stmt := db.stmtcache.Get(q)
 	if stmt == nil {
-		stmt, err := db.DB.Prepare(q)
+		var err error
+		stmt, err = db.DB.Prepare(q)
 		if err != nil {
 			return err
 		}
@@ -218,7 +219,8 @@ func (db *Sqlite) InsertUnique(table string, objptr interface{}) error {
 	q := strings.Join(cmd, " ") + ";"
 	stmt := db.stmtcache.Get(q)
 	if stmt == nil {
-		stmt, err := db.DB.Prepare(q)
+		var err error
+		stmt, err = db.DB.Prepare(q)
 		if err != nil {
 			return err
 		}
@@ -240,7 +242,8 @@ func (db *Sqlite) Find(table string, objptr interface{}, condition string) error
 	q := "SELECT * FROM " + wraptable(table) + " " + condition + ";"
 	stmt := db.stmtcache.Get(q)
 	if stmt == nil {
-		stmt, err := db.DB.Prepare(q)
+		var err error
+		stmt, err = db.DB.Prepare(q)
 		if err != nil {
 			return err
 		}
@@ -279,7 +282,8 @@ func (db *Sqlite) CanFind(table string, condition string) bool {
 	q := "SELECT * FROM " + wraptable(table) + " " + condition + ";"
 	stmt := db.stmtcache.Get(q)
 	if stmt == nil {
-		stmt, err := db.DB.Prepare(q)
+		var err error
+		stmt, err = db.DB.Prepare(q)
 		if err != nil {
 			return false
 		}
@@ -312,7 +316,8 @@ func (db *Sqlite) FindFor(table string, objptr interface{}, condition string, f 
 	q := "SELECT * FROM " + wraptable(table) + " " + condition + ";"
 	stmt := db.stmtcache.Get(q)
 	if stmt == nil {
-		stmt, err := db.DB.Prepare(q)
+		var err error
+		stmt, err = db.DB.Prepare(q)
 		if err != nil {
 			return err
 		}
@@ -363,7 +368,8 @@ func (db *Sqlite) ListTables() (s []string, err error) {
 	q := "SELECT name FROM sqlite_master where type='table' order by name;"
 	stmt := db.stmtcache.Get(q)
 	if stmt == nil {
-		stmt, err := db.DB.Prepare(q)
+		var err error
+		stmt, err = db.DB.Prepare(q)
 		if err != nil {
 			return nil, err
 		}
@@ -401,7 +407,8 @@ func (db *Sqlite) Del(table string, condition string) error {
 	q := "DELETE FROM " + wraptable(table) + " " + condition + ";"
 	stmt := db.stmtcache.Get(q)
 	if stmt == nil {
-		stmt, err := db.DB.Prepare(q)
+		var err error
+		stmt, err = db.DB.Prepare(q)
 		if err != nil {
 			return err
 		}
@@ -419,7 +426,8 @@ func (db *Sqlite) Drop(table string) error {
 	q := "DROP TABLE " + wraptable(table) + ";"
 	stmt := db.stmtcache.Get(q)
 	if stmt == nil {
-		stmt, err := db.DB.Prepare(q)
+		var err error
+		stmt, err = db.DB.Prepare(q)
 		if err != nil {
 			return err
 		}
@@ -438,7 +446,8 @@ func (db *Sqlite) Count(table string) (num int, err error) {
 	q := "SELECT COUNT(1) FROM " + wraptable(table) + ";"
 	stmt := db.stmtcache.Get(q)
 	if stmt == nil {
-		stmt, err := db.DB.Prepare(q)
+		var err error
+		stmt, err = db.DB.Prepare(q)
 		if err != nil {
 			return 0, err
 		}
