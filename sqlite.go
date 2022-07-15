@@ -10,7 +10,8 @@ import (
 	"unicode"
 
 	_ "github.com/fumiama/sqlite3" // 引入sqlite
-	"github.com/wdvxdr1123/ZeroBot/extension/ttl"
+
+	"github.com/FloatTech/ttl"
 )
 
 // Sqlite 数据库对象

@@ -3,8 +3,8 @@ module github.com/FloatTech/sqlite
 go 1.18
 
 require (
+	github.com/FloatTech/ttl v0.0.0-20220715042055-15612be72f5b
 	github.com/fumiama/sqlite3 v1.14.6
-	github.com/wdvxdr1123/ZeroBot v1.5.2-0.20220610070647-9eeffcb277ee
 )
 
 require (
