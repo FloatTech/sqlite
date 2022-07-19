@@ -5,8 +5,8 @@ A pure-go wrapper for database/sql using logoove/sqlite
 
 ```go
 type row struct {
-    id int // pk
-    name string
+    Id int // pk
+    Name string
 }
 
 db := &sql.Sqlite{DBPath: "demo.db"}
