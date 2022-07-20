@@ -5,8 +5,8 @@ A pure-go wrapper for database/sql using logoove/sqlite
 
 ```go
 type row struct {
-    id int // pk
-    name string
+    ID   int // pk
+    Name string
 }
 
 db := &sql.Sqlite{DBPath: "demo.db"}
@@ -20,13 +20,13 @@ if err != nil {
     panic(err)
 }
 
-err = db.Insert("demotable", &row{id: 123, name: "Anna"})
+err = db.Insert("demotable", &row{ID: 123, Name: "Anna"})
 if err != nil {
     panic(err)
 }
 
 var r row
-err = db.Find("demotable", &r, "WHERE id=123")
+err = db.Find("demotable", &r, "WHERE ID=123")
 if err != nil {
     panic(err)
 }
