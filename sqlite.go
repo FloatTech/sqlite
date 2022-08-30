@@ -334,7 +334,7 @@ func (db *Sqlite) FindFor(table string, objptr interface{}, condition string, f 
 	defer rows.Close()
 
 	if !rows.Next() {
-		return errors.New("sql.FindFor: null result")
+		return nil
 	}
 	err = rows.Scan(addrs(objptr)...)
 	if err == nil {
