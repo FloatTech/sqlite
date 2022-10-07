@@ -298,6 +298,40 @@ func (db *Sqlite) Find(table string, objptr interface{}, condition string) error
 	return err
 }
 
+// Query 查询数据库，写入最后一条结果到 objptr
+// q 为一整条查询语句, 慎用
+// 默认字段与结构体元素顺序一致
+// 返回错误
+func (db *Sqlite) Query(q string, objptr interface{}) error {
+	if db.DB == nil {
+		return ErrNilDB
+	}
+	stmt, err := db.compile(q)
+	if err != nil {
+		return err
+	}
+	rows, err := stmt.Query()
+	if err != nil {
+		return err
+	}
+	if rows.Err() != nil {
+		return rows.Err()
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return ErrNullResult
+	}
+	err = rows.Scan(addrs(objptr)...)
+	for rows.Next() {
+		if err != nil {
+			return err
+		}
+		err = rows.Scan(addrs(objptr)...)
+	}
+	return err
+}
+
 // CanFind 查询数据库是否有 condition
 // condition 可为"WHERE id = 0"
 // 默认字段与结构体元素顺序一致
@@ -327,6 +361,34 @@ func (db *Sqlite) CanFind(table string, condition string) bool {
 	return true
 }
 
+// CanQuery 查询数据库是否有 q
+// q 为一整条查询语句, 慎用
+// 默认字段与结构体元素顺序一致
+// 返回错误
+func (db *Sqlite) CanQuery(q string) bool {
+	if db.DB == nil {
+		return false
+	}
+	stmt, err := db.compile(q)
+	if err != nil {
+		return false
+	}
+	rows, err := stmt.Query()
+	if err != nil {
+		return false
+	}
+	if rows.Err() != nil {
+		return false
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return false
+	}
+	_ = rows.Close()
+	return true
+}
+
 // FindFor 查询数据库，用函数 f 遍历结果
 // condition 可为"WHERE id = 0"
 // 默认字段与结构体元素顺序一致
@@ -336,6 +398,46 @@ func (db *Sqlite) FindFor(table string, objptr interface{}, condition string, f 
 		return ErrNilDB
 	}
 	q := "SELECT * FROM " + wraptable(table) + " " + condition + ";"
+	stmt, err := db.compile(q)
+	if err != nil {
+		return err
+	}
+	rows, err := stmt.Query()
+	if err != nil {
+		return err
+	}
+	if rows.Err() != nil {
+		return rows.Err()
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return ErrNullResult
+	}
+	err = rows.Scan(addrs(objptr)...)
+	if err == nil {
+		err = f()
+	}
+	for rows.Next() {
+		if err != nil {
+			return err
+		}
+		err = rows.Scan(addrs(objptr)...)
+		if err == nil {
+			err = f()
+		}
+	}
+	return err
+}
+
+// QueryFor 查询数据库，用函数 f 遍历结果
+// q 为一整条查询语句, 慎用
+// 默认字段与结构体元素顺序一致
+// 返回错误
+func (db *Sqlite) QueryFor(q string, objptr interface{}, f func() error) error {
+	if db.DB == nil {
+		return ErrNilDB
+	}
 	stmt, err := db.compile(q)
 	if err != nil {
 		return err
