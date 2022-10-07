@@ -589,29 +589,33 @@ func kinds(objptr interface{}) (kinds []string) {
 	kinds = make([]string, flen)
 	for i := 0; i < flen; i++ {
 		switch elem.Field(i).Type().String() {
-		case "bool":
+		case "bool", "*bool":
 			kinds[i] = "BOOLEAN"
-		case "int8":
+		case "int8", "*int8":
 			kinds[i] = "TINYINT"
-		case "uint8", "byte":
+		case "uint8", "byte", "*uint8", "*byte":
 			kinds[i] = "UNSIGNED TINYINT"
-		case "int16":
+		case "int16", "*int16":
 			kinds[i] = "SMALLINT"
-		case "uint16":
+		case "uint16", "*uint16":
 			kinds[i] = "UNSIGNED SMALLINT"
-		case "int32", "rune":
+		case "int", "*int":
+			kinds[i] = "INTEGER"
+		case "uint", "*uint":
+			kinds[i] = "UNSIGNED INTEGER"
+		case "int32", "rune", "*int32", "*rune":
 			kinds[i] = "INT"
-		case "uint32":
+		case "uint32", "*uint32":
 			kinds[i] = "UNSIGNED INT"
-		case "int64":
+		case "int64", "*int64":
 			kinds[i] = "BIGINT"
-		case "uint64":
+		case "uint64", "*uint64":
 			kinds[i] = "UNSIGNED BIGINT"
-		case "float32":
+		case "float32", "*float32":
 			kinds[i] = "FLOAT"
-		case "float64":
+		case "float64", "*float64":
 			kinds[i] = "DOUBLE"
-		case "string", "[]string":
+		case "string", "[]string", "*string", "*[]string":
 			kinds[i] = "TEXT"
 		default:
 			kinds[i] = "BLOB"

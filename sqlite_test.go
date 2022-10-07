@@ -2,14 +2,15 @@ package sql
 
 import (
 	"bytes"
+	"os"
 	"testing"
 	"time"
 )
 
 func TestPackUnpack(t *testing.T) {
 	type teststruct struct {
-		A bool
-		B int8
+		A *int
+		B uint
 		C uint8
 		D uint16
 		E int32
@@ -21,7 +22,10 @@ func TestPackUnpack(t *testing.T) {
 		K []byte
 		L string
 		M []string
+		N *bool
+		O *int8
 	}
+	_ = os.Remove("test.db")
 	db := Sqlite{DBPath: "test.db"}
 	err := db.Open(time.Hour)
 	if err != nil {
@@ -31,56 +35,78 @@ func TestPackUnpack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	inst := teststruct{true, 2, 3, 4, 5, 6, 7, 8, 9.0, 10.0, []byte{1, 2, 3}, "123", []string{"123", "456"}}
+	var o int8 = 2
+	a := 2
+	n := true
+	inst := teststruct{&a, 2, 3, 4, 5, 6, 7, 8, 9.0, 10.0, []byte{1, 2, 3}, "123", []string{"123", "456"}, &n, nil}
 	err = db.Insert("test", &inst)
 	if err != nil {
 		t.Fatal(err)
 	}
-	tmp := teststruct{}
+	tmp := teststruct{O: &o}
 	err = db.Find("test", &tmp, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tmp.A != inst.A {
-		t.Fail()
+	if *tmp.A != *inst.A {
+		t.Fatal()
 	}
 	if tmp.B != inst.B {
-		t.Fail()
+		t.Fatal()
 	}
 	if tmp.C != inst.C {
-		t.Fail()
+		t.Fatal()
 	}
 	if tmp.D != inst.D {
-		t.Fail()
+		t.Fatal()
 	}
 	if tmp.E != inst.E {
-		t.Fail()
+		t.Fatal()
 	}
 	if tmp.F != inst.F {
-		t.Fail()
+		t.Fatal()
 	}
 	if tmp.F != inst.F {
-		t.Fail()
+		t.Fatal()
 	}
 	if tmp.G != inst.G {
-		t.Fail()
+		t.Fatal()
 	}
 	if tmp.H != inst.H {
-		t.Fail()
+		t.Fatal()
 	}
 	if tmp.I != inst.I {
-		t.Fail()
+		t.Fatal()
 	}
 	if tmp.J != inst.J {
-		t.Fail()
+		t.Fatal()
 	}
 	if !bytes.Equal(tmp.K, inst.K) {
-		t.Fail()
+		t.Fatal()
 	}
 	if tmp.L != inst.L {
-		t.Fail()
+		t.Fatal()
 	}
 	if tmp.M[0] != inst.M[0] {
-		t.Fail()
+		t.Fatal()
+	}
+	if *tmp.N != *inst.N {
+		t.Fatal()
+	}
+	if tmp.O != nil {
+		t.Fatal()
+	}
+	// 测试自增
+	err = db.Insert("test", &teststruct{M: []string{""}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmp = teststruct{O: &o}
+	err = db.Find("test", &tmp, "WHERE A=3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *tmp.A != 3 {
+		t.Fatal()
 	}
 }
