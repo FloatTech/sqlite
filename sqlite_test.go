@@ -110,3 +110,77 @@ func TestPackUnpack(t *testing.T) {
 		t.Fatal()
 	}
 }
+
+func TestFK(t *testing.T) {
+	type teacher struct {
+		ID   *int
+		Name string
+	}
+	type class struct {
+		ID           *int
+		TeacherID    int
+		StudentCount int
+	}
+	_ = os.Remove("test.db")
+	db := Sqlite{DBPath: "test.db"}
+	err := db.Open(time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.Create("teacher", &teacher{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.Insert("teacher", &teacher{Name: "Anna"}) // 0
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.Insert("teacher", &teacher{Name: "Bob"}) // 1
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.Insert("teacher", &teacher{Name: "Catalina"}) // 2
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.Insert("teacher", &teacher{Name: "Donald"}) // 3
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.Insert("teacher", &teacher{Name: "Emily"}) // 4
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.DB.Exec("PRAGMA foreign_keys = ON;")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.Create("class", &class{}, "FOREIGN KEY(TeacherID) REFERENCES teacher(ID)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.Insert("class", &class{TeacherID: 4, StudentCount: 66})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.Insert("class", &class{TeacherID: 3, StudentCount: 55})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.Insert("class", &class{TeacherID: 2, StudentCount: 44})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.Insert("class", &class{TeacherID: 1, StudentCount: 33})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.Insert("class", &class{TeacherID: 5, StudentCount: 22})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.Insert("class", &class{TeacherID: 6, StudentCount: 11})
+	if err == nil {
+		t.Fatal("unexpected success")
+	}
+}

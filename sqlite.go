@@ -94,7 +94,7 @@ func (db *Sqlite) mustcompile(q string) *sql.Stmt {
 // Create 生成数据库
 // 默认结构体的第一个元素为主键
 // 返回错误
-func (db *Sqlite) Create(table string, objptr interface{}) (err error) {
+func (db *Sqlite) Create(table string, objptr interface{}, additional ...string) (err error) {
 	if db.DB == nil {
 		err = ErrNilDB
 		return
@@ -107,17 +107,26 @@ func (db *Sqlite) Create(table string, objptr interface{}) (err error) {
 	)
 	cmd = append(cmd, "CREATE TABLE IF NOT EXISTS", wraptable(table), "(")
 	if top == 0 {
-		cmd = append(cmd, tags[0], kinds[0], "PRIMARY KEY NOT NULL);")
+		cmd = append(cmd, tags[0], kinds[0], "PRIMARY KEY")
+		if len(additional) > 0 {
+			cmd = append(cmd, ",")
+			cmd = append(cmd, strings.Join(additional, ","))
+		}
+		cmd = append(cmd, ")")
 	} else {
 		for i := range tags {
 			cmd = append(cmd, tags[i], kinds[i])
 			switch i {
 			default:
-				cmd = append(cmd, "NULL,")
+				cmd = append(cmd, ",")
 			case 0:
-				cmd = append(cmd, "PRIMARY KEY NOT NULL,")
+				cmd = append(cmd, "PRIMARY KEY,")
 			case top:
-				cmd = append(cmd, "NULL)")
+				if len(additional) > 0 {
+					cmd = append(cmd, ",")
+					cmd = append(cmd, strings.Join(additional, ","))
+				}
+				cmd = append(cmd, ")")
 			}
 		}
 	}
@@ -588,7 +597,8 @@ func kinds(objptr interface{}) (kinds []string) {
 	flen := elem.Type().NumField()
 	kinds = make([]string, flen)
 	for i := 0; i < flen; i++ {
-		switch elem.Field(i).Type().String() {
+		typ := elem.Field(i).Type().String()
+		switch typ {
 		case "bool", "*bool":
 			kinds[i] = "BOOLEAN"
 		case "int8", "*int8":
@@ -619,6 +629,11 @@ func kinds(objptr interface{}) (kinds []string) {
 			kinds[i] = "TEXT"
 		default:
 			kinds[i] = "BLOB"
+		}
+		if strings.Contains(typ, "*") || strings.Contains(typ, "[]") {
+			kinds[i] += " NULL"
+		} else {
+			kinds[i] += " NOT NULL"
 		}
 	}
 	return
