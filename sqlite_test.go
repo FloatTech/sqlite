@@ -131,23 +131,23 @@ func TestFK(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = db.Insert("teacher", &teacher{Name: "Anna"}) // 0
+	err = db.Insert("teacher", &teacher{Name: "Anna"}) // 1
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = db.Insert("teacher", &teacher{Name: "Bob"}) // 1
+	err = db.Insert("teacher", &teacher{Name: "Bob"}) // 2
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = db.Insert("teacher", &teacher{Name: "Catalina"}) // 2
+	err = db.Insert("teacher", &teacher{Name: "Catalina"}) // 3
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = db.Insert("teacher", &teacher{Name: "Donald"}) // 3
+	err = db.Insert("teacher", &teacher{Name: "Donald"}) // 4
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = db.Insert("teacher", &teacher{Name: "Emily"}) // 4
+	err = db.Insert("teacher", &teacher{Name: "Emily"}) // 5
 	if err != nil {
 		t.Fatal(err)
 	}
