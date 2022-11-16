@@ -10,7 +10,7 @@ type row struct {
 }
 
 db := &sql.Sqlite{DBPath: "demo.db"}
-err := db.Open()
+err := db.Open(time.Hour)
 if err != nil {
     panic(err)
 }
