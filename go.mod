@@ -18,3 +18,5 @@ require (
 )
 
 replace modernc.org/sqlite => github.com/fumiama/sqlite3 v1.20.0-simp
+
+replace github.com/remyoudompheng/bigfft => github.com/fumiama/bigfft v0.0.0-20211011143303-6e0bfa3c836b
