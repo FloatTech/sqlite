@@ -17,6 +17,7 @@ import (
 var (
 	ErrNilDB      = errors.New("sqlite: db is not initialized")
 	ErrNullResult = errors.New("sqlite: null result")
+	DriverName    = "sqlite3"
 )
 
 // Sqlite 数据库对象
@@ -29,7 +30,7 @@ type Sqlite struct {
 // Open 打开数据库
 func (db *Sqlite) Open(cachettl time.Duration) (err error) {
 	if db.DB == nil {
-		database, err := sql.Open("sqlite", db.DBPath)
+		database, err := sql.Open(DriverName, db.DBPath)
 		if err != nil {
 			return err
 		}
