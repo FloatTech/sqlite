@@ -1,8 +1,8 @@
 github.com/FloatTech/ttl v0.0.0-20220715042055-15612be72f5b h1:tvciXWq2nuvTbFeJGLDNIdRX3BI546D3O7k7vrVueZw=
 github.com/FloatTech/ttl v0.0.0-20220715042055-15612be72f5b/go.mod h1:fHZFWGquNXuHttu9dUYoKuNbm3dzLETnIOnm1muSfDs=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
-github.com/fumiama/sqlite3 v1.20.0 h1:Lsdl6WOiKK5IbtbRgN3j99QVX0DjeM052+CYDp0+ABE=
-github.com/fumiama/sqlite3 v1.20.0/go.mod h1:Xa/vRB/jo9QobtDK6vF+8ZMfDvkhN/8D6uo5gwKKzbM=
+github.com/fumiama/sqlite3 v1.20.0-simp h1:5Ppxix+LQdEULdxdSjerIW+V5qV2a/E+P2RQ1c1jnvE=
+github.com/fumiama/sqlite3 v1.20.0-simp/go.mod h1:Os58MHwYCcYZCy2PGChBrQtBAw5/LS1ZZOkfc+C/I7s=
 github.com/google/uuid v1.3.0 h1:t6JiXgmwXMjEs8VusXIJk2BXHsn+wx8BZdTaoZ5fu7I=
 github.com/google/uuid v1.3.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/mattn/go-isatty v0.0.16 h1:bq3VjFmv/sOjHtdEhmkEV4x1AJtvUvOJ2PFAZ5+peKQ=

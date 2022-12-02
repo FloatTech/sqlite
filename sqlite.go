@@ -9,7 +9,7 @@ import (
 	"time"
 	"unicode"
 
-	_ "github.com/fumiama/sqlite3" // 引入sqlite
+	_ "modernc.org/sqlite" // 引入sqlite
 
 	"github.com/FloatTech/ttl"
 )

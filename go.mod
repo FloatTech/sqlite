@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/FloatTech/ttl v0.0.0-20220715042055-15612be72f5b
-	github.com/fumiama/sqlite3 v1.20.0
+	modernc.org/sqlite v1.20.0
 )
 
 require (
@@ -16,3 +16,5 @@ require (
 	modernc.org/mathutil v1.5.0 // indirect
 	modernc.org/memory v1.4.0 // indirect
 )
+
+replace modernc.org/sqlite => github.com/fumiama/sqlite3 v1.20.0-simp
