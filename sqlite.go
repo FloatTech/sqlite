@@ -29,7 +29,7 @@ type Sqlite struct {
 // Open 打开数据库
 func (db *Sqlite) Open(cachettl time.Duration) (err error) {
 	if db.DB == nil {
-		database, err := sql.Open("sqlite3", db.DBPath)
+		database, err := sql.Open("sqlite", db.DBPath)
 		if err != nil {
 			return err
 		}
