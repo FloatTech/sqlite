@@ -612,7 +612,7 @@ func kinds(objptr interface{}) (kinds []string) {
 			kinds[i] = "UNSIGNED SMALLINT"
 		case "int", "*int":
 			kinds[i] = "INTEGER"
-		case "uint", "*uint":
+		case "uint", "*uint", "uintptr", "*uintptr":
 			kinds[i] = "UNSIGNED INTEGER"
 		case "int32", "rune", "*int32", "*rune":
 			kinds[i] = "INT"
@@ -629,7 +629,40 @@ func kinds(objptr interface{}) (kinds []string) {
 		case "string", "[]string", "*string", "*[]string":
 			kinds[i] = "TEXT"
 		default:
-			kinds[i] = "BLOB"
+			switch elem.Field(i).Kind() {
+			case reflect.Bool:
+				kinds[i] = "BOOLEAN"
+			case reflect.Int:
+				kinds[i] = "INTEGER"
+			case reflect.Int8:
+				kinds[i] = "TINYINT"
+			case reflect.Int16:
+				kinds[i] = "SMALLINT"
+			case reflect.Int32:
+				kinds[i] = "INT"
+			case reflect.Int64:
+				kinds[i] = "BIGINT"
+			case reflect.Uint:
+				kinds[i] = "UNSIGNED INTEGER"
+			case reflect.Uint8:
+				kinds[i] = "UNSIGNED TINYINT"
+			case reflect.Uint16:
+				kinds[i] = "UNSIGNED SMALLINT"
+			case reflect.Uint32:
+				kinds[i] = "UNSIGNED INT"
+			case reflect.Uint64:
+				kinds[i] = "UNSIGNED BIGINT"
+			case reflect.Uintptr:
+				kinds[i] = "UNSIGNED INTEGER"
+			case reflect.Float32:
+				kinds[i] = "FLOAT"
+			case reflect.Float64:
+				kinds[i] = "DOUBLE"
+			case reflect.String:
+				kinds[i] = "TEXT"
+			default:
+				kinds[i] = "BLOB"
+			}
 		}
 		if strings.Contains(typ, "*") || strings.Contains(typ, "[]") {
 			kinds[i] += " NULL"

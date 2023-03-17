@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+type myuint8 uint8
+
 func TestPackUnpack(t *testing.T) {
 	type teststruct struct {
 		A *int
@@ -24,6 +26,8 @@ func TestPackUnpack(t *testing.T) {
 		M []string
 		N *bool
 		O *int8
+		P time.Duration
+		Q myuint8
 	}
 	_ = os.Remove("test.db")
 	db := Sqlite{DBPath: "test.db"}
@@ -38,7 +42,7 @@ func TestPackUnpack(t *testing.T) {
 	var o int8 = 2
 	a := 2
 	n := true
-	inst := teststruct{&a, 2, 3, 4, 5, 6, 7, 8, 9.0, 10.0, []byte{1, 2, 3}, "123", []string{"123", "456"}, &n, nil}
+	inst := teststruct{&a, 2, 3, 4, 5, 6, 7, 8, 9.0, 10.0, []byte{1, 2, 3}, "123", []string{"123", "456"}, &n, nil, time.Second, 6}
 	err = db.Insert("test", &inst)
 	if err != nil {
 		t.Fatal(err)
@@ -94,6 +98,12 @@ func TestPackUnpack(t *testing.T) {
 		t.Fatal()
 	}
 	if tmp.O != nil {
+		t.Fatal()
+	}
+	if tmp.P != inst.P {
+		t.Fatal()
+	}
+	if tmp.Q != inst.Q {
 		t.Fatal()
 	}
 	// 测试自增
