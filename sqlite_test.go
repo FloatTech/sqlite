@@ -3,6 +3,7 @@ package sql
 import (
 	"bytes"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -192,5 +193,50 @@ func TestFK(t *testing.T) {
 	err = db.Insert("class", &class{TeacherID: 6, StudentCount: 11})
 	if err == nil {
 		t.Fatal("unexpected success")
+	}
+}
+
+func TestWriteInGenericFindFor(t *testing.T) {
+	type counter struct {
+		ID    *int
+		Count uint
+	}
+	_ = os.Remove("test.db")
+	db := Sqlite{DBPath: "test.db"}
+	err := db.Open(time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.Create("counter", &counter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 1; i <= 128; i++ {
+		err = db.Insert("counter", &counter{Count: uint(i)})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	counters, err := FindAll[counter](&db, "counter", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range counters {
+		c.Count += 10000
+		t.Log("set", *c.ID, "to", c.Count)
+		err = db.Insert("counter", c)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	time.Sleep(time.Second)
+	for i := 1; i <= 128; i++ {
+		c, err := Find[counter](&db, "counter", "WHERE ID="+strconv.Itoa(i))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if c.Count != uint(i)+10000 {
+			t.Fatal("expect", uint(i)+10000, "but get", c.Count)
+		}
 	}
 }

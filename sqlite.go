@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -92,9 +93,9 @@ func (db *Sqlite) mustcompile(q string) *sql.Stmt {
 	return stmt
 }
 
-// Create 生成数据库
-// 默认结构体的第一个元素为主键
-// 返回错误
+// Create 生成数据库.
+// 默认结构体的第一个元素为主键.
+// 返回错误.
 func (db *Sqlite) Create(table string, objptr interface{}, additional ...string) (err error) {
 	if db.DB == nil {
 		err = ErrNilDB
@@ -139,10 +140,10 @@ func (db *Sqlite) Create(table string, objptr interface{}, additional ...string)
 	return
 }
 
-// Insert 插入数据集
-// 如果 PK 存在会覆盖
-// 默认结构体的第一个元素为主键
-// 返回错误
+// Insert 插入数据集.
+// 如果 PK 存在会覆盖.
+// 默认结构体的第一个元素为主键.
+// 返回错误.
 func (db *Sqlite) Insert(table string, objptr interface{}) error {
 	if db.DB == nil {
 		return ErrNilDB
@@ -206,10 +207,10 @@ func (db *Sqlite) Insert(table string, objptr interface{}) error {
 	return err
 }
 
-// InsertUnique 插入数据集
-// 如果 PK 存在会报错
-// 默认结构体的第一个元素为主键
-// 返回错误
+// InsertUnique 插入数据集.
+// 如果 PK 存在会报错.
+// 默认结构体的第一个元素为主键.
+// 返回错误.
 func (db *Sqlite) InsertUnique(table string, objptr interface{}) error {
 	if db.DB == nil {
 		return ErrNilDB
@@ -273,10 +274,10 @@ func (db *Sqlite) InsertUnique(table string, objptr interface{}) error {
 	return err
 }
 
-// Find 查询数据库，写入最后一条结果到 objptr
-// condition 可为"WHERE id = 0"
-// 默认字段与结构体元素顺序一致
-// 返回错误
+// Find 查询数据库，写入最后一条结果到 objptr.
+// condition 可为"WHERE id = 0".
+// 默认字段与结构体元素顺序一致.
+// 返回错误.
 func (db *Sqlite) Find(table string, objptr interface{}, condition string) error {
 	if db.DB == nil {
 		return ErrNilDB
@@ -308,10 +309,48 @@ func (db *Sqlite) Find(table string, objptr interface{}, condition string) error
 	return err
 }
 
-// Query 查询数据库，写入最后一条结果到 objptr
-// q 为一整条查询语句, 慎用
-// 默认字段与结构体元素顺序一致
-// 返回错误
+// Find 查询数据库，返回最后一条结果.
+// condition 可为"WHERE id = 0".
+// 默认字段与结构体元素顺序一致.
+// 返回错误.
+func Find[T any](db *Sqlite, table string, condition string) (obj T, err error) {
+	if db.DB == nil {
+		err = ErrNilDB
+		return
+	}
+	q := "SELECT * FROM " + wraptable(table) + " " + condition + ";"
+	stmt, err := db.compile(q)
+	if err != nil {
+		return
+	}
+	rows, err := stmt.Query()
+	if err != nil {
+		return
+	}
+	err = rows.Err()
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		err = ErrNullResult
+		return
+	}
+	err = rows.Scan(addrs(&obj)...)
+	for rows.Next() {
+		if err != nil {
+			return
+		}
+		err = rows.Scan(addrs(&obj)...)
+	}
+	return
+}
+
+// Query 查询数据库，写入最后一条结果到 objptr.
+// q 为一整条查询语句, 慎用.
+// 默认字段与结构体元素顺序一致.
+// 返回错误.
 func (db *Sqlite) Query(q string, objptr interface{}) error {
 	if db.DB == nil {
 		return ErrNilDB
@@ -342,10 +381,47 @@ func (db *Sqlite) Query(q string, objptr interface{}) error {
 	return err
 }
 
-// CanFind 查询数据库是否有 condition
-// condition 可为"WHERE id = 0"
-// 默认字段与结构体元素顺序一致
-// 返回错误
+// Query 查询数据库，返回最后一条结果.
+// q 为一整条查询语句, 慎用.
+// 默认字段与结构体元素顺序一致.
+// 返回错误.
+func Query[T any](db *Sqlite, q string) (obj T, err error) {
+	if db.DB == nil {
+		err = ErrNilDB
+		return
+	}
+	stmt, err := db.compile(q)
+	if err != nil {
+		return
+	}
+	rows, err := stmt.Query()
+	if err != nil {
+		return
+	}
+	err = rows.Err()
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		err = ErrNullResult
+		return
+	}
+	err = rows.Scan(addrs(&obj)...)
+	for rows.Next() {
+		if err != nil {
+			return
+		}
+		err = rows.Scan(addrs(&obj)...)
+	}
+	return
+}
+
+// CanFind 查询数据库是否有 condition.
+// condition 可为"WHERE id = 0".
+// 默认字段与结构体元素顺序一致.
+// 返回错误.
 func (db *Sqlite) CanFind(table string, condition string) bool {
 	if db.DB == nil {
 		return false
@@ -371,10 +447,10 @@ func (db *Sqlite) CanFind(table string, condition string) bool {
 	return true
 }
 
-// CanQuery 查询数据库是否有 q
-// q 为一整条查询语句, 慎用
-// 默认字段与结构体元素顺序一致
-// 返回错误
+// CanQuery 查询数据库是否有 q.
+// q 为一整条查询语句, 慎用.
+// 默认字段与结构体元素顺序一致.
+// 返回错误.
 func (db *Sqlite) CanQuery(q string) bool {
 	if db.DB == nil {
 		return false
@@ -399,10 +475,10 @@ func (db *Sqlite) CanQuery(q string) bool {
 	return true
 }
 
-// FindFor 查询数据库，用函数 f 遍历结果
-// condition 可为"WHERE id = 0"
-// 默认字段与结构体元素顺序一致
-// 返回错误
+// FindFor 查询数据库，用函数 f 遍历结果.
+// condition 可为"WHERE id = 0".
+// 默认字段与结构体元素顺序一致.
+// 返回错误.
 func (db *Sqlite) FindFor(table string, objptr interface{}, condition string, f func() error) error {
 	if db.DB == nil {
 		return ErrNilDB
@@ -440,10 +516,55 @@ func (db *Sqlite) FindFor(table string, objptr interface{}, condition string, f 
 	return err
 }
 
-// QueryFor 查询数据库，用函数 f 遍历结果
-// q 为一整条查询语句, 慎用
-// 默认字段与结构体元素顺序一致
-// 返回错误
+// FindAll 查询数据库，返回多个结果.
+// condition 可为"WHERE id = 0".
+// 默认字段与结构体元素顺序一致.
+// 返回错误.
+func FindAll[T any](db *Sqlite, table string, condition string) ([]*T, error) {
+	if db.DB == nil {
+		return nil, ErrNilDB
+	}
+	q := "SELECT * FROM " + wraptable(table) + " " + condition + ";"
+	stmt, err := db.compile(q)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := stmt.Query()
+	if err != nil {
+		return nil, err
+	}
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return nil, ErrNullResult
+	}
+	vals := make([]*T, 1, 64)
+	var v T
+	err = rows.Scan(addrs(&v)...)
+	if err != nil {
+		return nil, err
+	}
+	vals[0] = &v
+	for rows.Next() {
+		if err != nil {
+			return nil, err
+		}
+		var v T
+		err = rows.Scan(addrs(&v)...)
+		if err == nil {
+			vals = append(vals, &v)
+		}
+	}
+	return vals, nil
+}
+
+// QueryFor 查询数据库，用函数 f 遍历结果.
+// q 为一整条查询语句, 慎用.
+// 默认字段与结构体元素顺序一致.
+// 返回错误.
 func (db *Sqlite) QueryFor(q string, objptr interface{}, f func() error) error {
 	if db.DB == nil {
 		return ErrNilDB
@@ -480,12 +601,64 @@ func (db *Sqlite) QueryFor(q string, objptr interface{}, f func() error) error {
 	return err
 }
 
+// QueryAll 查询数据库，返回多个结果.
+// q 为一整条查询语句, 慎用.
+// 默认字段与结构体元素顺序一致.
+// 返回错误.
+func QueryAll[T any](db *Sqlite, q string) ([]*T, error) {
+	if db.DB == nil {
+		return nil, ErrNilDB
+	}
+	stmt, err := db.compile(q)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := stmt.Query()
+	if err != nil {
+		return nil, err
+	}
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return nil, ErrNullResult
+	}
+	vals := make([]*T, 1, 64)
+	var v T
+	err = rows.Scan(addrs(&v)...)
+	if err != nil {
+		return nil, err
+	}
+	vals[0] = &v
+	for rows.Next() {
+		if err != nil {
+			return nil, err
+		}
+		var v T
+		err = rows.Scan(addrs(&v)...)
+		if err == nil {
+			vals = append(vals, &v)
+		}
+	}
+	return vals, nil
+}
+
 // Pick 从 table 随机一行
 func (db *Sqlite) Pick(table string, objptr interface{}) error {
 	if db.DB == nil {
 		return ErrNilDB
 	}
 	return db.Find(table, objptr, "ORDER BY RANDOM() limit 1")
+}
+
+// PickFor 从 table 随机多行
+func (db *Sqlite) PickFor(table string, n uint, objptr interface{}, f func() error) error {
+	if db.DB == nil {
+		return ErrNilDB
+	}
+	return db.FindFor(table, objptr, "ORDER BY RANDOM() limit "+strconv.Itoa(int(n)), f)
 }
 
 // ListTables 列出所有表名
@@ -516,9 +689,9 @@ func (db *Sqlite) ListTables() (s []string, err error) {
 	return
 }
 
-// Del 删除数据库表项
-// condition 可为"WHERE id = 0"
-// 返回错误
+// Del 删除数据库表项.
+// condition 可为"WHERE id = 0".
+// 返回错误.
 func (db *Sqlite) Del(table string, condition string) error {
 	if db.DB == nil {
 		return ErrNilDB
@@ -546,8 +719,8 @@ func (db *Sqlite) Drop(table string) error {
 	return err
 }
 
-// Count 查询数据库行数
-// 返回行数以及错误
+// Count 查询数据库行数.
+// 返回行数以及错误.
 func (db *Sqlite) Count(table string) (num int, err error) {
 	if db.DB == nil {
 		return 0, ErrNilDB
