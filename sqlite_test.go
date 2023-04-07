@@ -240,3 +240,29 @@ func TestWriteInGenericFindFor(t *testing.T) {
 		}
 	}
 }
+
+func TestAdditionalTags(t *testing.T) {
+	type counter struct {
+		ID          *int
+		UniqueCount uint `db:"UniqueCount,UNIQUE"`
+	}
+	_ = os.Remove("test.db")
+	db := Sqlite{DBPath: "test.db"}
+	err := db.Open(time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.Create("counter", &counter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.Insert("counter", &counter{UniqueCount: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := 2
+	err = db.InsertUnique("counter", &counter{ID: &id, UniqueCount: 1})
+	if err == nil {
+		t.Fatal("unexpected insert")
+	}
+}

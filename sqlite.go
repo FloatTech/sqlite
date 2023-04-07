@@ -109,7 +109,8 @@ func (db *Sqlite) Create(table string, objptr interface{}, additional ...string)
 	)
 	cmd = append(cmd, "CREATE TABLE IF NOT EXISTS", wraptable(table), "(")
 	if top == 0 {
-		cmd = append(cmd, tags[0], kinds[0], "PRIMARY KEY")
+		pk, _, _ := strings.Cut(tags[0], ",")
+		cmd = append(cmd, pk, kinds[0], "PRIMARY KEY")
 		if len(additional) > 0 {
 			cmd = append(cmd, ",")
 			cmd = append(cmd, strings.Join(additional, ","))
@@ -117,7 +118,11 @@ func (db *Sqlite) Create(table string, objptr interface{}, additional ...string)
 		cmd = append(cmd, ")")
 	} else {
 		for i := range tags {
-			cmd = append(cmd, tags[i], kinds[i])
+			name, addi, hasaddi := strings.Cut(tags[i], ",")
+			cmd = append(cmd, name, kinds[i])
+			if hasaddi && i > 0 {
+				cmd = append(cmd, addi)
+			}
 			switch i {
 			default:
 				cmd = append(cmd, ",")
