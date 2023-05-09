@@ -807,7 +807,12 @@ func kinds(objptr interface{}) (kinds []string) {
 		case "string", "[]string", "*string", "*[]string":
 			kinds[i] = "TEXT"
 		default:
-			switch elem.Field(i).Kind() {
+			k := elem.Field(i).Kind()
+			if k == reflect.Interface || k == reflect.Pointer {
+				typ = "*"
+				k = elem.Field(i).Elem().Kind()
+			}
+			switch k {
 			case reflect.Bool:
 				kinds[i] = "BOOLEAN"
 			case reflect.Int:
