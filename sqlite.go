@@ -23,19 +23,23 @@ var (
 
 // Sqlite 数据库对象
 type Sqlite struct {
-	DB        *sql.DB
-	DBPath    string
+	db        *sql.DB
+	dbpath    string
 	stmtcache *ttl.Cache[string, *sql.Stmt]
+}
+
+func New(dbpath string) Sqlite {
+	return Sqlite{dbpath: dbpath}
 }
 
 // Open 打开数据库
 func (db *Sqlite) Open(cachettl time.Duration) (err error) {
-	if db.DB == nil {
-		database, err := sql.Open(DriverName, db.DBPath)
+	if db.db == nil {
+		database, err := sql.Open(DriverName, db.dbpath)
 		if err != nil {
 			return err
 		}
-		db.DB = database
+		db.db = database
 	}
 	if db.stmtcache == nil {
 		db.stmtcache = ttl.NewCacheOn(cachettl, [4]func(string, *sql.Stmt){
@@ -49,9 +53,9 @@ func (db *Sqlite) Open(cachettl time.Duration) (err error) {
 
 // Close 关闭数据库
 func (db *Sqlite) Close() (err error) {
-	if db.DB != nil {
-		err = db.DB.Close()
-		db.DB = nil
+	if db.db != nil {
+		err = db.db.Close()
+		db.db = nil
 		db.stmtcache.Destroy()
 		db.stmtcache = nil
 	}
@@ -71,7 +75,7 @@ func (db *Sqlite) compile(q string) (*sql.Stmt, error) {
 	stmt := db.stmtcache.Get(q)
 	if stmt == nil {
 		var err error
-		stmt, err = db.DB.Prepare(q)
+		stmt, err = db.db.Prepare(q)
 		if err != nil {
 			return nil, err
 		}
@@ -84,7 +88,7 @@ func (db *Sqlite) mustcompile(q string) *sql.Stmt {
 	stmt := db.stmtcache.Get(q)
 	if stmt == nil {
 		var err error
-		stmt, err = db.DB.Prepare(q)
+		stmt, err = db.db.Prepare(q)
 		if err != nil {
 			panic(err)
 		}
@@ -97,7 +101,7 @@ func (db *Sqlite) mustcompile(q string) *sql.Stmt {
 // 默认结构体的第一个元素为主键.
 // 返回错误.
 func (db *Sqlite) Create(table string, objptr interface{}, additional ...string) (err error) {
-	if db.DB == nil {
+	if db.db == nil {
 		err = ErrNilDB
 		return
 	}
@@ -150,7 +154,7 @@ func (db *Sqlite) Create(table string, objptr interface{}, additional ...string)
 // 默认结构体的第一个元素为主键.
 // 返回错误.
 func (db *Sqlite) Insert(table string, objptr interface{}) error {
-	if db.DB == nil {
+	if db.db == nil {
 		return ErrNilDB
 	}
 	table = wraptable(table)
@@ -217,7 +221,7 @@ func (db *Sqlite) Insert(table string, objptr interface{}) error {
 // 默认结构体的第一个元素为主键.
 // 返回错误.
 func (db *Sqlite) InsertUnique(table string, objptr interface{}) error {
-	if db.DB == nil {
+	if db.db == nil {
 		return ErrNilDB
 	}
 	table = wraptable(table)
@@ -279,12 +283,12 @@ func (db *Sqlite) InsertUnique(table string, objptr interface{}) error {
 	return err
 }
 
-// Find 查询数据库，写入最后一条结果到 objptr.
+// Find 查询数据库，写入第一条结果到 objptr.
 // condition 可为"WHERE id = 0".
 // 默认字段与结构体元素顺序一致.
 // 返回错误.
-func (db *Sqlite) Find(table string, objptr interface{}, condition string) error {
-	if db.DB == nil {
+func (db *Sqlite) Find(table string, objptr interface{}, condition string, questions ...interface{}) error {
+	if db.db == nil {
 		return ErrNilDB
 	}
 	q := "SELECT * FROM " + wraptable(table) + " " + condition + ";"
@@ -292,7 +296,7 @@ func (db *Sqlite) Find(table string, objptr interface{}, condition string) error
 	if err != nil {
 		return err
 	}
-	rows, err := stmt.Query()
+	rows, err := stmt.Query(questions...)
 	if err != nil {
 		return err
 	}
@@ -306,20 +310,20 @@ func (db *Sqlite) Find(table string, objptr interface{}, condition string) error
 	}
 	err = rows.Scan(addrs(objptr)...)
 	for rows.Next() {
-		if err != nil {
-			return err
+		if err == nil {
+			return nil
 		}
 		err = rows.Scan(addrs(objptr)...)
 	}
 	return err
 }
 
-// Find 查询数据库，返回最后一条结果.
+// Find 查询数据库，返回第一条结果.
 // condition 可为"WHERE id = 0".
 // 默认字段与结构体元素顺序一致.
 // 返回错误.
-func Find[T any](db *Sqlite, table string, condition string) (obj T, err error) {
-	if db.DB == nil {
+func Find[T any](db *Sqlite, table string, condition string, questions ...interface{}) (obj T, err error) {
+	if db.db == nil {
 		err = ErrNilDB
 		return
 	}
@@ -328,7 +332,7 @@ func Find[T any](db *Sqlite, table string, condition string) (obj T, err error) 
 	if err != nil {
 		return
 	}
-	rows, err := stmt.Query()
+	rows, err := stmt.Query(questions...)
 	if err != nil {
 		return
 	}
@@ -344,7 +348,7 @@ func Find[T any](db *Sqlite, table string, condition string) (obj T, err error) 
 	}
 	err = rows.Scan(addrs(&obj)...)
 	for rows.Next() {
-		if err != nil {
+		if err == nil {
 			return
 		}
 		err = rows.Scan(addrs(&obj)...)
@@ -352,19 +356,19 @@ func Find[T any](db *Sqlite, table string, condition string) (obj T, err error) 
 	return
 }
 
-// Query 查询数据库，写入最后一条结果到 objptr.
+// Query 查询数据库，写入第一条结果到 objptr.
 // q 为一整条查询语句, 慎用.
 // 默认字段与结构体元素顺序一致.
 // 返回错误.
-func (db *Sqlite) Query(q string, objptr interface{}) error {
-	if db.DB == nil {
+func (db *Sqlite) Query(q string, objptr interface{}, args ...interface{}) error {
+	if db.db == nil {
 		return ErrNilDB
 	}
 	stmt, err := db.compile(q)
 	if err != nil {
 		return err
 	}
-	rows, err := stmt.Query()
+	rows, err := stmt.Query(args...)
 	if err != nil {
 		return err
 	}
@@ -378,7 +382,7 @@ func (db *Sqlite) Query(q string, objptr interface{}) error {
 	}
 	err = rows.Scan(addrs(objptr)...)
 	for rows.Next() {
-		if err != nil {
+		if err == nil {
 			return err
 		}
 		err = rows.Scan(addrs(objptr)...)
@@ -386,12 +390,12 @@ func (db *Sqlite) Query(q string, objptr interface{}) error {
 	return err
 }
 
-// Query 查询数据库，返回最后一条结果.
+// Query 查询数据库，返回第一条结果.
 // q 为一整条查询语句, 慎用.
 // 默认字段与结构体元素顺序一致.
 // 返回错误.
-func Query[T any](db *Sqlite, q string) (obj T, err error) {
-	if db.DB == nil {
+func Query[T any](db *Sqlite, q string, args ...interface{}) (obj T, err error) {
+	if db.db == nil {
 		err = ErrNilDB
 		return
 	}
@@ -399,7 +403,7 @@ func Query[T any](db *Sqlite, q string) (obj T, err error) {
 	if err != nil {
 		return
 	}
-	rows, err := stmt.Query()
+	rows, err := stmt.Query(args...)
 	if err != nil {
 		return
 	}
@@ -415,7 +419,7 @@ func Query[T any](db *Sqlite, q string) (obj T, err error) {
 	}
 	err = rows.Scan(addrs(&obj)...)
 	for rows.Next() {
-		if err != nil {
+		if err == nil {
 			return
 		}
 		err = rows.Scan(addrs(&obj)...)
@@ -427,8 +431,8 @@ func Query[T any](db *Sqlite, q string) (obj T, err error) {
 // condition 可为"WHERE id = 0".
 // 默认字段与结构体元素顺序一致.
 // 返回错误.
-func (db *Sqlite) CanFind(table string, condition string) bool {
-	if db.DB == nil {
+func (db *Sqlite) CanFind(table string, condition string, questions ...interface{}) bool {
+	if db.db == nil {
 		return false
 	}
 	q := "SELECT * FROM " + wraptable(table) + " " + condition + ";"
@@ -436,7 +440,7 @@ func (db *Sqlite) CanFind(table string, condition string) bool {
 	if err != nil {
 		return false
 	}
-	rows, err := stmt.Query()
+	rows, err := stmt.Query(questions...)
 	if err != nil {
 		return false
 	}
@@ -456,15 +460,15 @@ func (db *Sqlite) CanFind(table string, condition string) bool {
 // q 为一整条查询语句, 慎用.
 // 默认字段与结构体元素顺序一致.
 // 返回错误.
-func (db *Sqlite) CanQuery(q string) bool {
-	if db.DB == nil {
+func (db *Sqlite) CanQuery(q string, questions ...interface{}) bool {
+	if db.db == nil {
 		return false
 	}
 	stmt, err := db.compile(q)
 	if err != nil {
 		return false
 	}
-	rows, err := stmt.Query()
+	rows, err := stmt.Query(questions...)
 	if err != nil {
 		return false
 	}
@@ -484,8 +488,8 @@ func (db *Sqlite) CanQuery(q string) bool {
 // condition 可为"WHERE id = 0".
 // 默认字段与结构体元素顺序一致.
 // 返回错误.
-func (db *Sqlite) FindFor(table string, objptr interface{}, condition string, f func() error) error {
-	if db.DB == nil {
+func (db *Sqlite) FindFor(table string, objptr interface{}, condition string, f func() error, questions ...interface{}) error {
+	if db.db == nil {
 		return ErrNilDB
 	}
 	q := "SELECT * FROM " + wraptable(table) + " " + condition + ";"
@@ -493,7 +497,7 @@ func (db *Sqlite) FindFor(table string, objptr interface{}, condition string, f 
 	if err != nil {
 		return err
 	}
-	rows, err := stmt.Query()
+	rows, err := stmt.Query(questions...)
 	if err != nil {
 		return err
 	}
@@ -525,8 +529,8 @@ func (db *Sqlite) FindFor(table string, objptr interface{}, condition string, f 
 // condition 可为"WHERE id = 0".
 // 默认字段与结构体元素顺序一致.
 // 返回错误.
-func FindAll[T any](db *Sqlite, table string, condition string) ([]*T, error) {
-	if db.DB == nil {
+func FindAll[T any](db *Sqlite, table string, condition string, questions ...interface{}) ([]*T, error) {
+	if db.db == nil {
 		return nil, ErrNilDB
 	}
 	q := "SELECT * FROM " + wraptable(table) + " " + condition + ";"
@@ -534,7 +538,7 @@ func FindAll[T any](db *Sqlite, table string, condition string) ([]*T, error) {
 	if err != nil {
 		return nil, err
 	}
-	rows, err := stmt.Query()
+	rows, err := stmt.Query(questions...)
 	if err != nil {
 		return nil, err
 	}
@@ -570,15 +574,15 @@ func FindAll[T any](db *Sqlite, table string, condition string) ([]*T, error) {
 // q 为一整条查询语句, 慎用.
 // 默认字段与结构体元素顺序一致.
 // 返回错误.
-func (db *Sqlite) QueryFor(q string, objptr interface{}, f func() error) error {
-	if db.DB == nil {
+func (db *Sqlite) QueryFor(q string, objptr interface{}, f func() error, questions ...interface{}) error {
+	if db.db == nil {
 		return ErrNilDB
 	}
 	stmt, err := db.compile(q)
 	if err != nil {
 		return err
 	}
-	rows, err := stmt.Query()
+	rows, err := stmt.Query(questions...)
 	if err != nil {
 		return err
 	}
@@ -610,15 +614,15 @@ func (db *Sqlite) QueryFor(q string, objptr interface{}, f func() error) error {
 // q 为一整条查询语句, 慎用.
 // 默认字段与结构体元素顺序一致.
 // 返回错误.
-func QueryAll[T any](db *Sqlite, q string) ([]*T, error) {
-	if db.DB == nil {
+func QueryAll[T any](db *Sqlite, q string, questions ...interface{}) ([]*T, error) {
+	if db.db == nil {
 		return nil, ErrNilDB
 	}
 	stmt, err := db.compile(q)
 	if err != nil {
 		return nil, err
 	}
-	rows, err := stmt.Query()
+	rows, err := stmt.Query(questions...)
 	if err != nil {
 		return nil, err
 	}
@@ -651,25 +655,25 @@ func QueryAll[T any](db *Sqlite, q string) ([]*T, error) {
 }
 
 // Pick 从 table 随机一行
-func (db *Sqlite) Pick(table string, objptr interface{}) error {
-	if db.DB == nil {
+func (db *Sqlite) Pick(table string, objptr interface{}, questions ...interface{}) error {
+	if db.db == nil {
 		return ErrNilDB
 	}
-	return db.Find(table, objptr, "ORDER BY RANDOM() limit 1")
+	return db.Find(table, objptr, "ORDER BY RANDOM() limit 1", questions...)
 }
 
 // PickFor 从 table 随机多行
-func (db *Sqlite) PickFor(table string, n uint, objptr interface{}, f func() error) error {
-	if db.DB == nil {
+func (db *Sqlite) PickFor(table string, n uint, objptr interface{}, f func() error, questions ...interface{}) error {
+	if db.db == nil {
 		return ErrNilDB
 	}
-	return db.FindFor(table, objptr, "ORDER BY RANDOM() limit "+strconv.Itoa(int(n)), f)
+	return db.FindFor(table, objptr, "ORDER BY RANDOM() limit "+strconv.Itoa(int(n)), f, questions...)
 }
 
 // ListTables 列出所有表名
 // 返回所有表名+错误
 func (db *Sqlite) ListTables() (s []string, err error) {
-	if db.DB == nil {
+	if db.db == nil {
 		return nil, ErrNilDB
 	}
 	rows, err := db.mustcompile("SELECT name FROM sqlite_master where type='table' order by name;").Query()
@@ -697,8 +701,8 @@ func (db *Sqlite) ListTables() (s []string, err error) {
 // Del 删除数据库表项.
 // condition 可为"WHERE id = 0".
 // 返回错误.
-func (db *Sqlite) Del(table string, condition string) error {
-	if db.DB == nil {
+func (db *Sqlite) Del(table string, condition string, questions ...interface{}) error {
+	if db.db == nil {
 		return ErrNilDB
 	}
 	q := "DELETE FROM " + wraptable(table) + " " + condition + ";"
@@ -706,13 +710,13 @@ func (db *Sqlite) Del(table string, condition string) error {
 	if err != nil {
 		return err
 	}
-	_, err = stmt.Exec()
+	_, err = stmt.Exec(questions...)
 	return err
 }
 
 // Drop 删除数据库表
 func (db *Sqlite) Drop(table string) error {
-	if db.DB == nil {
+	if db.db == nil {
 		return ErrNilDB
 	}
 	q := "DROP TABLE " + wraptable(table) + ";"
@@ -727,7 +731,7 @@ func (db *Sqlite) Drop(table string) error {
 // Count 查询数据库行数.
 // 返回行数以及错误.
 func (db *Sqlite) Count(table string) (num int, err error) {
-	if db.DB == nil {
+	if db.db == nil {
 		return 0, ErrNilDB
 	}
 	stmt, err := db.compile("SELECT COUNT(1) FROM " + wraptable(table) + ";")

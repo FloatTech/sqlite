@@ -3,6 +3,14 @@ A pure-go wrapper for database/sql using logoove/sqlite
 
 ## Usage
 
+### 1. Replace modified sqlite lib in your go.mod
+```bash
+replace modernc.org/sqlite => github.com/fumiama/sqlite3 v1.29.10-simp
+
+replace modernc.org/libc => github.com/fumiama/libc v0.0.0-20240530081950-6f6d8586b5c5
+```
+
+### 2. Use it
 ```go
 type row struct {
     ID   int // pk
