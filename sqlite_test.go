@@ -113,7 +113,8 @@ func TestPackUnpack(t *testing.T) {
 		t.Fatal(err)
 	}
 	tmp = teststruct{O: &o}
-	err = db.Find("test", &tmp, "WHERE A = ?", 3)
+	q, s := QuerySet("WHERE A", "IN", []int{3})
+	err = db.Find("test", &tmp, q, s...)
 	if err != nil {
 		t.Fatal(err)
 	}
