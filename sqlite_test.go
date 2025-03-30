@@ -163,7 +163,7 @@ func TestFK(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = db.db.Exec("PRAGMA foreign_keys = ON;")
+	_, err = db.Exec("PRAGMA foreign_keys = ON;")
 	if err != nil {
 		t.Fatal(err)
 	}

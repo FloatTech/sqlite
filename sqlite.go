@@ -97,6 +97,11 @@ func (db *Sqlite) mustcompile(q string) *sql.Stmt {
 	return stmt
 }
 
+// Exec wrap of (*sql.DB).Exec for PRAGMA settings
+func (db *Sqlite) Exec(query string, args ...any) (sql.Result, error) {
+	return db.db.Exec(query, args...)
+}
+
 // Create 生成数据库.
 // 默认结构体的第一个元素为主键.
 // 返回错误.
